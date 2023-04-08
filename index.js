@@ -228,11 +228,14 @@ const run = async () => {
 
       res.send({ status: false });
     })
-  } finally {
+  } catch(error) {
+    app.get("/", (req, res)=>{
+      res.send("Server is down for a bit.")
+    })
   }
 };
 
-run().catch((err) => console.log(err));
+run();
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
