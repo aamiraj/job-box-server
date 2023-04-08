@@ -15,5 +15,16 @@
   },
   "devDependencies": {
     "nodemon": "^2.0.20"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mir-hussain/jobbox-server.git"
+  },
+  "keywords": [],
+  "author": "",
+  "bugs": {
+    "url": "https://github.com/mir-hussain/jobbox-server/issues"
+  },
+  "homepage": "https://github.com/mir-hussain/jobbox-server#readme",
+  "description": ""
 }

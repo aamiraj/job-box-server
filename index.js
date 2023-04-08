@@ -9,7 +9,7 @@ const cors = require("cors");
 app.use(cors());
 app.use(express.json());
 
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.q66zrl2.mongodb.net/?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ghnljed.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -21,6 +21,7 @@ const run = async () => {
     const db = client.db("jobbox");
     const userCollection = db.collection("user");
     const jobCollection = db.collection("job");
+    const chatCollection = db.collection("chat");
 
     app.post("/user", async (req, res) => {
       const user = req.body;
@@ -42,14 +43,26 @@ const run = async () => {
       res.send({ status: false });
     });
 
+    app.patch("/user/:email", async (req, res) => {
+      const email = req.params.email;
+      const filter = { email: email };
+      const updateDoc = {
+        $set: req.body,
+      };
+      const options = { upsert: true };
+      const result = await userCollection.updateOne(filter, updateDoc, options);
+      res.send(result);
+    });
+
     app.patch("/apply", async (req, res) => {
       const userId = req.body.userId;
       const jobId = req.body.jobId;
       const email = req.body.email;
+      const approvalStatus = req.body.approvalStatus;
 
       const filter = { _id: ObjectId(jobId) };
       const updateDoc = {
-        $push: { applicants: { id: ObjectId(userId), email } },
+        $push: { applicants: { id: ObjectId(userId), email, approvalStatus } },
       };
 
       const result = await jobCollection.updateOne(filter, updateDoc);
@@ -90,9 +103,10 @@ const run = async () => {
 
     app.patch("/reply", async (req, res) => {
       const userId = req.body.userId;
+      //const email = req.body.email;
       const reply = req.body.reply;
-      console.log(reply);
-      console.log(userId);
+      //console.log(reply);
+      //console.log(userId);
 
       const filter = { "queries.id": ObjectId(userId) };
 
@@ -120,9 +134,8 @@ const run = async () => {
     app.get("/applied-jobs/:email", async (req, res) => {
       const email = req.params.email;
       const query = { applicants: { $elemMatch: { email: email } } };
-      const cursor = jobCollection.find(query).project({ applicants: 0 });
+      const cursor = jobCollection.find(query);
       const result = await cursor.toArray();
-
       res.send({ status: true, data: result });
     });
 
@@ -146,6 +159,75 @@ const run = async () => {
 
       res.send({ status: true, data: result });
     });
+
+    app.get("/jobsByEmployer/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { "employer.email": email };
+      const cursor = jobCollection.find(query);
+      const result = await cursor.toArray();
+      res.send({ status: true, data: result });
+    });
+
+    app.patch("/updateJobStatus/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const option = { upsert: true };
+      const updateDoc = { $set: { status: "closed" } };
+      const result = await jobCollection.updateOne(filter, updateDoc, option);
+      res.send({ status: true, data: result });
+    });
+
+    app.get("/candidate-details/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await userCollection.findOne(query);
+      res.send({ status: true, data: result });
+    });
+
+    app.post("/messege", async (req, res) => {
+      const messegeData = req.body;
+      const result = await chatCollection.insertOne(messegeData);
+      res.send({ status: true, data: result });
+    });
+
+    app.get("/messege/:from", async (req, res) => {
+      const from = req.params.from;
+      const to = req.query.to;
+      const messegeFromTo = await chatCollection
+        .find({ fromId: from, toId: to })
+        .toArray();
+      const messegeToFrom = await chatCollection
+        .find({ fromId: to, toId: from })
+        .toArray();
+
+      const sortFunction = (a, b) => {
+        return new Date(a.messegeDate) - new Date(b.messegeDate);
+      };
+
+      const unsortedMesseges = messegeFromTo.concat(messegeToFrom);
+      const messeges = unsortedMesseges.sort(sortFunction);
+
+      //console.log(messeges);
+      res.send({ status: true, data: messeges });
+    });
+
+    app.patch("/updateApprovalStatus/:id", async(req, res)=>{
+      const userId = req.params.id
+      const {approvalStatus, jobId} = req.body
+      const filter = { _id: ObjectId(jobId), "applicants.id":ObjectId(userId) };
+
+      const updateDoc = {
+        $set: { "applicants.$.approvalStatus":approvalStatus },
+      };
+
+      const result = await jobCollection.updateOne(filter, updateDoc);
+      //console.log(result)
+      if (result.modifiedCount>0) {
+        return res.send({ status: true, data: result });
+      }
+
+      res.send({ status: false });
+    })
   } finally {
   }
 };
